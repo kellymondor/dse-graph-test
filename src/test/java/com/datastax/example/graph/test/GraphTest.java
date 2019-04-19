@@ -4,12 +4,14 @@ import com.datastax.driver.dse.DseCluster;
 import com.datastax.driver.dse.DseSession;
 import com.datastax.driver.dse.graph.GraphResultSet;
 import com.datastax.driver.dse.graph.GraphStatement;
-import com.datastax.driver.dse.graph.SimpleGraphStatement;
+
+import com.datastax.dse.graph.api.DseGraph;
+
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -17,26 +19,27 @@ import static org.junit.Assert.fail;
 /**
  * Simple JUnit DSE Graph test example
  *
- * Created by davidfelcey on 30/09/2016.
  */
 public class GraphTest {
     private static final Logger logger = LoggerFactory.getLogger(GraphTest.class);
+    // run DSE in docker and use IP of docker container
     private static final String GRAPH_HOST = "127.0.0.1";
     private static final String GRAPH_NAME = "remote_test";
     private DseCluster dseCluster = null;
     private DseSession dseSession = null;
 
     /**
-     * Connect to the DSE cluster,  establish a session and create a test graph
+     * Connect to the DSE docker container, establish a session and create a test graph
      *
      * @throws Exception if any errors occur
      */
     @org.junit.Before
     public void setUp() throws Exception {
         // Connect to DSE cluster
-        dseCluster = DseCluster.builder()
+        DseCluster dseCluster = DseCluster.builder()
                 .addContactPoint(GRAPH_HOST)
                 .build();
+
         dseSession = dseCluster.connect();
         logger.debug("Connected to " + GRAPH_HOST);
 
@@ -60,30 +63,26 @@ public class GraphTest {
     }
 
     /**
-     * Simple test to write and then read a vertex
+     * Simple test to read a vertex and check correct property is returned using the fluent graph API.
      *
      * @throws Exception if any errors occour
      */
     @org.junit.Test
     public void testGraphQuery() throws Exception {
         try {
-            // Insert a new vertex
-            GraphStatement s1 = new SimpleGraphStatement("g.addV(label, 'test_vertex')").setGraphName(GRAPH_NAME);
-            dseSession.executeGraph(s1);
-            logger.debug("Added vertex to graph " + GRAPH_NAME);
+            // Query the graph for a vertex
+            GraphTraversalSource g = DseGraph.traversal();
+            GraphTraversal traversal = g.V().has("person", "name", "marko"); // Java-based Gremlin Traversal API, more comfortable than a String query
 
-            // Allow for graph modification
-            TimeUnit.SECONDS.sleep(10);
+            GraphStatement s1 = DseGraph.statementFromTraversal(traversal).setGraphName(GRAPH_NAME);
+            GraphResultSet rs = dseSession.executeGraph(s1);
 
-            // Query the graph for the new vertex
-            GraphStatement s2 = new SimpleGraphStatement("g.V()").setGraphName(GRAPH_NAME);
-            GraphResultSet rs = dseSession.executeGraph(s2);
-            String vertexLabel = rs.one().asVertex().getLabel();
+            String name = rs.one().asVertex().getProperty("name").toString();
 
-            logger.debug("Vertex label: " + vertexLabel);
+            logger.debug("Name property: " + name);
 
             // Check vertex label matches value created
-            assertEquals(vertexLabel, "test_vertex");
+            assertEquals(name, "marko");
         } catch (Exception e) {
             e.printStackTrace();
             fail(e.getMessage());
