@@ -31,9 +31,9 @@
     Turn on slow query logging by setting this logger to DEBUG;
     set level to TRACE to also log query parameters
     -->
-    <logger name="com.datastax.driver.core.QueryLogger.SLOW" level="DEBUG"/>
+    <logger name="com.datastax.driver.core.QueryLogger.SLOW" level="WARN"/>
 
-    <root level="DEBUG">
+    <root level="WARN">
         <appender-ref ref="async"/>
     </root>
 
